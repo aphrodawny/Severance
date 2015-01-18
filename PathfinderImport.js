@@ -325,8 +325,6 @@ on('chat:message', function (msg) {
 
     data = stripStringRegEx(data, "<", ">");
     
-    log(data);
-    
     var charName = data[0].trim();
     
     // check if the character entry already exists, if so error and exit.
