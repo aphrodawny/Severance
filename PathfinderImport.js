@@ -1,5 +1,6 @@
 /* PATHFINDER STAT BLOCK IMPORTER FOR ROLL20 API
     Author Jason.P 18/1/2015
+    Version 1.02
 	This script was written to import as much detail as possible from Pathfinder Reference Document's
 	Stat Blocks into the Pathfinder NPC sheets. (may work a HeroLab stat blocks too, need to test)
 	
@@ -352,6 +353,7 @@ on('chat:message', function (msg) {
     
     //Determine and enter CR
     var Header = data[0].split("CR");
+    var tokenName = Header[0].trim();
     var CR = Header[1];
     AddAttribute("npc-cr",CR,charID);
     
@@ -497,7 +499,19 @@ on('chat:message', function (msg) {
     acFromNamed = acFromNamed + acNumOnly[acSizeIndex];
     }
     //puts any other AC bonuses than the named into MISC
-    var miscAC = sumArray(acNumOnly)-acFromNamed-dexMod
+    var ac = 0;
+    
+    if (sizeNum >= 0) {
+        ac = sumArray(acNumOnly)+10; // if creature has + size AC bonus then simple
+    }
+    else {
+        ac = sumArray(acNumOnly)+10 - 2*sizeNum; 
+        // if creature has - size AC bonus then the array summed incorrectly (added instead of subtracted) 
+        // correct by subtracting double
+    }
+    
+    // every other type of AC bonus than those named reports to misc
+    var miscAC = sumArray(acNumOnly)-acFromNamed-dexMod;
     AddAttribute("AC-misc",miscAC,charID);
     
     
@@ -712,8 +726,18 @@ on('chat:message', function (msg) {
     AddAttribute("npc-combat-gear",gearStr[0],charID);
     AddAttribute("npc-other-gear",gearStr[1],charID);
     }
-    }
+   
     
+    //****************  sets Token Name, Health, linked AC ******************
+    
+    token.set("name", tokenName);
+    token.set("showname", true);
+    token.set("bar3_value", HP);
+    token.set("bar3_max", HP);
+    token.set("bar2_value", ac);
+    token.set("showplayers_bar3", true);
+
+    }
 });
 
 
