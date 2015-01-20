@@ -1,6 +1,10 @@
 /* PATHFINDER STAT BLOCK IMPORTER FOR ROLL20 API
     Author Jason.P 18/1/2015
-    Version 1.02
+    Version 1.04
+    
+    1.04 edits - added in an statement to catch "undefined" variables attempting to be written to the
+    character sheet- now returns an error message and ignores.
+    
 	This script was written to import as much detail as possible from Pathfinder Reference Document's
 	Stat Blocks into the Pathfinder NPC sheets. (may work a HeroLab stat blocks too, need to test)
 	
@@ -57,12 +61,20 @@
 
 var AddAttribute = AddAttribute || {};
 function AddAttribute(attr, value, charID) {
+    if (value === undefined)
+    {
+        log(attr + " has returned an undefined value.");
+        sendChat("Error on " + attr + " attribute", "This attribute has been ignored.");
+    }
+    else
+    {
     createObj("attribute", {
 		name: attr,
 		current: value,
 		characterid: charID
 	});
 	return;
+    }
 }
 
 function stripString(str, removeStr, replaceWith) {
@@ -291,7 +303,8 @@ on('chat:message', function (msg) {
  
     var token = getObj('graphic', msg.selected[0]._id);
     if (token.get('subtype') != 'token') return; // Don't try to set the light radius of a drawing or card
-
+    
+    
     //*************  START CREATING CHARACTER****************
     // get notes from token
     var originalGmNotes = token.get('gmnotes');
@@ -730,15 +743,12 @@ on('chat:message', function (msg) {
     
     //****************  sets Token Name, Health, linked AC ******************
     
-    token.set("name", tokenName);
+    token.set("name", tokenName||'');
     token.set("showname", true);
-    token.set("bar3_value", HP);
-    token.set("bar3_max", HP);
-    token.set("bar2_value", ac);
+    token.set("bar3_value", HP||0);
+    token.set("bar3_max", HP||0);
+    token.set("bar2_value", ac||0);
     token.set("showplayers_bar3", true);
 
     }
 });
-
-
-
