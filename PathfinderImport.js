@@ -378,7 +378,7 @@ on('chat:message', function (msg) {
     // Alignment, Size, Type
     var sizesWithSpace = "Fine ,Diminutive ,Tiny ,Small ,Medium ,Large ,Huge ,Gargantuan ,Colossal ";
     var sizesArray = sizesWithSpace.split(",");
-
+    
     for (var i = 0; i < 9; i++) 
     {
         if (findString(data, sizesArray[i], true) !== null) 
@@ -469,19 +469,20 @@ on('chat:message', function (msg) {
     var acLine = findString(data, "AC ", true);        
     var acBreakdown = getSubStr(acLine,"(",")" );
     acBreakdown = acBreakdown.slice(1);
-    acBreakdown = acBreakdown.replace("-","+") //if there is a size penalty change to + for time being, remove later
+    acBreakdown = stripString(acBreakdown,"-","+") //if there is a size or dex penalty with -, change to + for time being, remove later
     var acSeparate = acBreakdown.split("+");
     var acNumOnly = acBreakdown.split("+");
-    
     acNumOnly = removeNonNumericFromArray(acNumOnly);
     var acSeparateNames = removeNumbersFromArray (acSeparate);
-    
+    log(acNumOnly);
+    log(acSeparateNames);
     var armorIndex = acSeparate.indexOf("armor");
     var shieldIndex = acSeparate.indexOf("shield");
     var deflectIndex = acSeparate.indexOf("deflection");
     var dodgeIndex = acSeparate.indexOf("dodge");
     var naturalIndex = acSeparate.indexOf("natural");
     var acSizeIndex = acSeparate.indexOf("size");
+
     //If the search found that armour in the breakdown, put that value in the 
     //NPC sheet and add the values used to acFromNamed in order to determine
     // the total miscellenous armour bonus
@@ -507,23 +508,24 @@ on('chat:message', function (msg) {
     AddAttribute("AC-natural",acNumOnly[naturalIndex],charID);
     acFromNamed = acFromNamed + acNumOnly[naturalIndex];
     }
-        if (acSizeIndex != -1) {
-    acFromNamed = acFromNamed + acNumOnly[acSizeIndex];
-    }
-    //puts any other AC bonuses than the named into MISC
+
+//puts any other AC bonuses than the named into MISC
     var ac = 0;
     
     if (sizeNum >= 0) {
         ac = sumArray(acNumOnly)+10; // if creature has + size AC bonus then simple
     }
     else {
-        ac = sumArray(acNumOnly)+10 - 2*sizeNum; 
+        ac = sumArray(acNumOnly)+10 + 2*sizeNum; 
         // if creature has - size AC bonus then the array summed incorrectly (added instead of subtracted) 
         // correct by subtracting double
     }
-    
+    if (dexMod <= 0){
+        ac = ac + dexMod*2; //correct for negative dex bonuses
+    }
+    log(ac);
     // every other type of AC bonus than those named reports to misc
-    var miscAC = sumArray(acNumOnly)-acFromNamed-dexMod;
+    var miscAC = ac - (10 + acFromNamed +sizeNum + dexMod);
     AddAttribute("AC-misc",miscAC,charID);
     
     
