@@ -378,8 +378,7 @@ on('chat:message', function (msg) {
     // Alignment, Size, Type
     var sizesWithSpace = "Fine ,Diminutive ,Tiny ,Small ,Medium ,Large ,Huge ,Gargantuan ,Colossal ";
     var sizesArray = sizesWithSpace.split(",");
-    var sizeLine = findString(data, "Init", true);
-    
+
     for (var i = 0; i < 9; i++) 
     {
         if (findString(data, sizesArray[i], true) !== null) 
