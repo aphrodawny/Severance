@@ -1,11 +1,11 @@
 /* PATHFINDER STAT BLOCK IMPORTER FOR ROLL20 API
     Author Jason.P 18/1/2015
-    Version 1.04
+    Version 2.01
     
-    1.04 edits - added in an statement to catch "undefined" variables attempting to be written to the
-    character sheet- now returns an error message and ignores.
+    V 2.01 Edits -- This is the large update that implements a lot of the improved functions provided
+    by The Aaron! Thanks mate, this is great stuff! Should be a lot more robust / efficient.
     
-	This script was written to import as much detail as possible from Pathfinder Reference Document's
+    This script was written to import as much detail as possible from Pathfinder Reference Document's
 	Stat Blocks into the Pathfinder NPC sheets. (may work a HeroLab stat blocks too, need to test)
 	
 	****** Huge shout out to Peter W, Kevin and HoneyBadger from the forums********
@@ -59,9 +59,11 @@
 	
 */
 
+var RegExpEscapeSpecial =/([\/\\\/\[\]\(\)\{\}\?\+\*\|\.\^\$])/g;
+
 var AddAttribute = AddAttribute || {};
 function AddAttribute(attr, value, charID) {
-    if (value === undefined)
+    if (value === undefined )
     {
         log(attr + " has returned an undefined value.");
         sendChat("Error on " + attr + " attribute", "This attribute has been ignored.");
@@ -78,15 +80,13 @@ function AddAttribute(attr, value, charID) {
 }
 
 function stripString(str, removeStr, replaceWith) {
-    while (str.indexOf(removeStr) != -1) {
-        str = str.replace(removeStr, replaceWith);
-    }
-    return str;
+    var r= new RegExp(removeStr.replace(RegExpEscapeSpecial,"\\$1"),'g');
+    return str.replace(r,replaceWith);
 }
 
+
 /*Cleans up the string leaving text and hyperlinks */
-function cleanUpString(strSpecials) 
-{
+function cleanUpString(strSpecials)  {
     strSpecials = stripString(strSpecials, "%20", " ");
     strSpecials = stripString(strSpecials, "%22", "\"");
     strSpecials = stripString(strSpecials, "%29", ")");
@@ -145,153 +145,68 @@ function cleanUpString(strSpecials)
 
 /* Deletes any characters between the character a and b in incstr */
 function stripStringRegEx(incstr, a, b) {
-    var str = incstr;
-    done = false;
- 
-    while (done === false) {
-        if (str.length === 0) {
-            done = true;
-        }
-        var ai = str.indexOf(a);
-        if (ai === -1) {
-            done = true;
-        }
-        else {
-            var bi = ai + 1;
-            while (str[bi] != b) {
-                bi++;
-                if (bi >= str.length) {
-                    done = true;
-                    break;
-                }
-            }
-            if (bi < str.length) {
-                bi++;
-                var subst = str.substring(ai, bi);
-                var tempstr;
-                if (subst !== null) {
-                    tempstr = str.replace(subst, "");
-                    str = tempstr;
-                }
-            }
-        }
-    }
-    return str;
+    var ea = a.replace(RegExpEscapeSpecial,"\\$1"),
+        eb = b.replace(RegExpEscapeSpecial,"\\$1"),
+        r = new RegExp( ea+'.*?'+eb , 'g');
+    return incstr.replace(r,'');
 }
 
 /* Deletes the links from the string str */
-function removeLinks(str) 
-{
+function removeLinks(str) {
     return stripStringRegEx(str, "<", ">");
 }
 
 //looks for an occurrence of str in the array strArray, if found returns that element
-function findString(strArray, str, doConcat) 
-{
-    var fullStr = "";
-    for (var i = 0; i < strArray.length; i++) 
-    {
-        if (doConcat)
-        {
-            if (strArray[i].indexOf(str) != -1)
-            {
-                var ct = 0;
-                for (var k = i; k < strArray.length; k++) 
-                {
-                    var splitStr = strArray[k].split(" ");
-                    if (splitStr[splitStr.length-1].indexOf("and") != -1)
-                    {
-                        for (var j = 0; j < splitStr.length-1; j++)
-                        {
-                            fullStr = fullStr + " "+ splitStr[j];
-                        }
-                        fullStr = fullStr + " , ";
-                        ct++;
-                    }
-                    else if (ct >= 1)
-                    {
-                        fullStr = fullStr + strArray[k];
-                        
-                        return fullStr;
-                    }
-                    else
-                    {
-                        if (fullStr == "")
-                            return strArray[i];
-                        else
-                            return fullStr;
-                    }
-                }
+// on doConcat, strips a trailing "and" and concatenates with the next line.
+function findString(strArray, str, doConcat) {
+    var retr,
+    r = new RegExp(str.replace(RegExpEscapeSpecial,"\\$1"));
+    _.find(strArray,function(v,k,l){
+        if(v.match(r)){
+            retr = v;
+            if(doConcat && v.match(/and$/) && l[k+1]) {
+                retr=retr.replace(/and$/,'')+', '+l[k+1];
             }
+            return true;
         }
-        else if (strArray[i].indexOf(str) != -1) 
-        {
-            return strArray[i];
-        }
-    }
-    return null;
+        return false;
+    });
+    return retr;
 };
 
 /* returns the string between two characters a/b */
 function getSubStr(str, a, b) {
-    var ai = -1;
-    var bi = -1;
-    for (var i = 0; i < str.length; i++) {
- 
-        if (ai == -1 && str[i] == a) {
-            ai = i;
-        }
-        else if (bi == -1 && str[i] == b) {
-            bi = i;
-            break;
-        }
-    }
-    if (ai != -1 && bi != -1) {
-        var retStr = str.substring(ai + 1, bi);
-        return retStr;
-    }
-    return null;
+    var ea = a.replace(RegExpEscapeSpecial,"\\$1"),
+        eb = b.replace(RegExpEscapeSpecial,"\\$1"),
+        r = new RegExp( ea+'(.*?)'+eb),
+        m = str.match(r); 
+    return m && m[1];
+}
+
+//removes numbers from array and trims white space on ends of elements
+function removeNumbersFromArray (strArray)
+{
+    return _.map(strArray,function(s){
+        return s.replace(/\d+/g,'').trim();
+    });
 }
 
 function removeNonNumericFromArray (strArray)
 {
-    
-    for (var i = 0; i < strArray.length; i++) 
-        {
-        strArray[i] = strArray[i].replace(/\D/g,"");
-        strArray[i] = parseInt(strArray[i])
-        }
-    return strArray;
-}
-//removes numbers from array and trims white space on ends of elements
-function removeNumbersFromArray (strArray)
-{
-        for (var i = 0; i < strArray.length; i++) 
-        {
-        strArray[i] = strArray[i].replace(/[0-9]/g, "");
-        strArray[i] = strArray[i].trim()
-        }
-    return strArray;
+    return _.map(strArray,function(s){
+        return parseInt(s.replace(/\D+/g,''),10 || 0);
+    });
 }
 
-function sumArray(numArray)
-{
-    var sum = 0
-    for (var i = 0; i < numArray.length; i++) 
-    {
-        if(numArray[i] != NaN) {
-            sum = sum + numArray[i];
-        }
-    }
-
-    return sum;
+function sumArray(numArray) {
+    return _.reduce(numArray,function(acc,n){
+        return acc + ( parseInt(n,10) || 0 );
+    }, 0);
 }
 
-function getAbilityMod(ability)
-{
-    var mod = (ability-10)/2;
-    mod = Math.floor(mod);
-    return mod;
+
+function getAbilityMod(ability) {
+    return Math.floor((ability-10)/2);
 }
 
 on('chat:message', function (msg) {
@@ -337,8 +252,6 @@ on('chat:message', function (msg) {
         }
     }
 
-    data = stripStringRegEx(data, "<", ">");
-    
     var charName = data[0].trim();
     
     // check if the character entry already exists, if so error and exit.
@@ -378,10 +291,10 @@ on('chat:message', function (msg) {
     // Alignment, Size, Type
     var sizesWithSpace = "Fine ,Diminutive ,Tiny ,Small ,Medium ,Large ,Huge ,Gargantuan ,Colossal ";
     var sizesArray = sizesWithSpace.split(",");
-    
+
     for (var i = 0; i < 9; i++) 
     {
-        if (findString(data, sizesArray[i], true) !== null) 
+        if (findString(data, sizesArray[i], true) !== undefined) 
         {
             var sizeLine = findString(data, sizesArray[i], true);
             break;
@@ -390,6 +303,9 @@ on('chat:message', function (msg) {
     }
     
     //get subtype before destroying string
+
+    
+    
     var subType = getSubStr(sizeLine, "(", ")");
     
     //remove the brackets and anything between them, trim the string,
@@ -466,7 +382,7 @@ on('chat:message', function (msg) {
     }
     
     //*****AC Breakdown**************
-    var acLine = findString(data, "AC ", true);        
+    var acLine = findString(data, "AC ", true);
     var acBreakdown = getSubStr(acLine,"(",")" );
     acBreakdown = acBreakdown.slice(1);
     acBreakdown = stripString(acBreakdown,"-","+") //if there is a size or dex penalty with -, change to + for time being, remove later
@@ -474,24 +390,27 @@ on('chat:message', function (msg) {
     var acNumOnly = acBreakdown.split("+");
     acNumOnly = removeNonNumericFromArray(acNumOnly);
     var acSeparateNames = removeNumbersFromArray (acSeparate);
-    log(acNumOnly);
-    log(acSeparateNames);
-    var armorIndex = acSeparate.indexOf("armor");
-    var shieldIndex = acSeparate.indexOf("shield");
-    var deflectIndex = acSeparate.indexOf("deflection");
-    var dodgeIndex = acSeparate.indexOf("dodge");
-    var naturalIndex = acSeparate.indexOf("natural");
-    var acSizeIndex = acSeparate.indexOf("size");
-
+   
+    var armorIndex = acSeparateNames.indexOf("armor");
+    var shieldIndex = acSeparateNames.indexOf("shield");
+    var deflectIndex = acSeparateNames.indexOf("deflection");
+    var dodgeIndex = acSeparateNames.indexOf("dodge");
+    var naturalIndex = acSeparateNames.indexOf("natural");
+    var acSizeIndex = acSeparateNames.indexOf("size");
     //If the search found that armour in the breakdown, put that value in the 
     //NPC sheet and add the values used to acFromNamed in order to determine
     // the total miscellenous armour bonus
     var acFromNamed = 0
     
+    var natural = acNumOnly[naturalIndex];
+    log("Natural");
+    log(natural);
+    
     if (armorIndex != -1) {
     AddAttribute("armor-acbonus",acNumOnly[armorIndex],charID);
     acFromNamed = acFromNamed + acNumOnly[armorIndex];
     }
+    
     if (shieldIndex != -1) {
     AddAttribute("shield-acbonus",acNumOnly[shieldIndex],charID);
     acFromNamed = acFromNamed + acNumOnly[shieldIndex];
@@ -508,6 +427,7 @@ on('chat:message', function (msg) {
     AddAttribute("AC-natural",acNumOnly[naturalIndex],charID);
     acFromNamed = acFromNamed + acNumOnly[naturalIndex];
     }
+    var natural = acNumOnly[naturalIndex];
 
 //puts any other AC bonuses than the named into MISC
     var ac = 0;
@@ -523,7 +443,6 @@ on('chat:message', function (msg) {
     if (dexMod <= 0){
         ac = ac + dexMod*2; //correct for negative dex bonuses
     }
-    log(ac);
     // every other type of AC bonus than those named reports to misc
     var miscAC = ac - (10 + acFromNamed +sizeNum + dexMod);
     AddAttribute("AC-misc",miscAC,charID);
@@ -750,6 +669,6 @@ on('chat:message', function (msg) {
     token.set("bar3_max", HP||0);
     token.set("bar2_value", ac||0);
     token.set("showplayers_bar3", true);
-
+    
     }
 });
