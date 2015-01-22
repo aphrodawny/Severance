@@ -402,10 +402,6 @@ on('chat:message', function (msg) {
     // the total miscellenous armour bonus
     var acFromNamed = 0
     
-    var natural = acNumOnly[naturalIndex];
-    log("Natural");
-    log(natural);
-    
     if (armorIndex != -1) {
     AddAttribute("armor-acbonus",acNumOnly[armorIndex],charID);
     acFromNamed = acFromNamed + acNumOnly[armorIndex];
