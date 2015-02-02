@@ -1,20 +1,21 @@
 /* PATHFINDER STAT BLOCK IMPORTER FOR ROLL20 API
     Author Jason.P 18/1/2015
-    Version 2.01
+    Version 2.25
     
-    V 2.01 Edits -- This is the large update that implements a lot of the improved functions provided
-    by The Aaron! Thanks mate, this is great stuff! Should be a lot more robust / efficient.
+    Updated to Parse both Ranged and Melee attacks (Aaron you will see a lot of your influence here! :-D)
     
     This script was written to import as much detail as possible from Pathfinder Reference Document's
-	Stat Blocks into the Pathfinder NPC sheets. (may work a HeroLab stat blocks too, need to test)
+    Stat Blocks into the Pathfinder NPC sheets. (may work a HeroLab stat blocks too, need to test)
 	
-	****** Huge shout out to Peter W, Kevin and HoneyBadger from the forums********
-	****** I used a lot of your work to do this!
+    ****** Huge shout out first of all to Aaron for all his help and feedback. Wouldn't be able to do this without the tips!
+	****** Also Peter W for his original layout and the initial parsing. Kevin and HoneyBadger too for their work of this kind.
 	
 	IT IMPORTS:
 	Name
 	CR 
 	XP
+    	Race
+	class name and level
 	Alignment
 	Type and Subtype (string)
 	Size
@@ -25,28 +26,29 @@
 	HP
 	Fort, Ref, Will saves (bonuses that add up correctly with releant ability mods) + save notes
 	Defensive Abiliites (string, only if the line leads with "Defensive Abilities")
+    	Weaknesses,DR,Resistances,Immunities,SR 
 	Speed (base, burrow, climb, fly, maneuverability, swim)
 	Special Attacks (string)
 	Tactics (Before combat, during combat as string)
 	Abilities (STR - > CHA)
 	Base Attack Bonus
+    	Feats
 	Languages (as string)
 	Special Qualities (as string)
 	Gear (combat, Other as string)
-	
+    	Melee and Ranged Attacks (Parses, writes attack roll and damage roll macros, partially updates Repeating Weapon slots in char 	sheet)
+    
+    
 	IT DOES NOT AT THIS POINT IMPORT:
-	Attacks,weapons, spells etc - i generally do these in separate macros
-	Race (its there, but >.<)
-	class name and level
-	Weaknesses,DR,Resistances,Immunities,SR 
-	CMB,CMD specifics and Notes 
+	special abilities
+    	spells
+    	CMB,CMD specifics and Notes 
 	
-	Mainly because i wasn't sure on the logic to separate them out. And i need sleep/ beer.
-	
-	It also doesn't attempt to put in attack macro's etc, i prefer to have them separate at this point.
-	
+	Slowly working through the list of 'does nots'. next on the chopping block- Special abilities!
+
+
 	INSTRUCTIONS
-	1. Go to PRD website, find yourself some baddies (or NPC's)
+	1. Go to PRD (PFSRD does work, but beware formatting!) website, find yourself some baddies (or NPC's)
 	2. Copy the stat block from *Name CRX* to Combat/Other Gear (or SQ, whatever is last. Can copy more, just doesn't get used)
 	3. Paste the stat block into the GM Notes Section of a token in your roll20 campaign.
         Clean up the title as you want it to appear in your Journal - like "Valeros CR12"
@@ -59,7 +61,9 @@
 	
 */
 
+
 var RegExpEscapeSpecial =/([\/\\\/\[\]\(\)\{\}\?\+\*\|\.\^\$])/g;
+
 
 var AddAttribute = AddAttribute || {};
 function AddAttribute(attr, value, charID) {
@@ -74,15 +78,31 @@ function AddAttribute(attr, value, charID) {
 		name: attr,
 		current: value,
 		characterid: charID
+        
 	});
+    //use the line below for diagnostics!
+    //log(attr + ", " + value);
 	return;
     }
 }
-
+// function that adds the various abilities
+var AddAbility = AddAbility || {};
+function addAbility(ability, text, charID) {
+createObj("ability", {
+                name: ability,
+                description: "",
+                action: text,
+                istokenaction: true,
+                characterid: charID
+            });
+}   
+            
 function stripString(str, removeStr, replaceWith) {
     var r= new RegExp(removeStr.replace(RegExpEscapeSpecial,"\\$1"),'g');
     return str.replace(r,replaceWith);
 }
+
+
 
 
 /*Cleans up the string leaving text and hyperlinks */
@@ -143,6 +163,7 @@ function cleanUpString(strSpecials)  {
     return strSpecials;
 }
 
+
 /* Deletes any characters between the character a and b in incstr */
 function stripStringRegEx(incstr, a, b) {
     var ea = a.replace(RegExpEscapeSpecial,"\\$1"),
@@ -151,10 +172,12 @@ function stripStringRegEx(incstr, a, b) {
     return incstr.replace(r,'');
 }
 
+
 /* Deletes the links from the string str */
 function removeLinks(str) {
     return stripStringRegEx(str, "<", ">");
 }
+
 
 //looks for an occurrence of str in the array strArray, if found returns that element
 // on doConcat, strips a trailing "and" and concatenates with the next line.
@@ -174,6 +197,7 @@ function findString(strArray, str, doConcat) {
     return retr;
 };
 
+
 /* returns the string between two characters a/b */
 function getSubStr(str, a, b) {
     var ea = a.replace(RegExpEscapeSpecial,"\\$1"),
@@ -183,6 +207,17 @@ function getSubStr(str, a, b) {
     return m && m[1];
 }
 
+
+/* returns every string between two characters a/b */
+function getAllSubStr(str, a, b) {
+    var ea = a.replace(RegExpEscapeSpecial,"\\$1"),
+        eb = b.replace(RegExpEscapeSpecial,"\\$1"),
+        r = new RegExp( ea+'(.*?)'+eb,'g'),
+        m = str.match(r); 
+    return m;
+}
+
+
 //removes numbers from array and trims white space on ends of elements
 function removeNumbersFromArray (strArray)
 {
@@ -191,12 +226,14 @@ function removeNumbersFromArray (strArray)
     });
 }
 
+
 function removeNonNumericFromArray (strArray)
 {
     return _.map(strArray,function(s){
         return parseInt(s.replace(/\D+/g,''),10 || 0);
     });
 }
+
 
 function sumArray(numArray) {
     return _.reduce(numArray,function(acc,n){
@@ -205,9 +242,168 @@ function sumArray(numArray) {
 }
 
 
+
+
 function getAbilityMod(ability) {
     return Math.floor((ability-10)/2);
 }
+
+
+function parseAttack(data,searchString, attackBonus, dmgBonus, reach,repeatStartNum, charID) {
+        // start with the whole attack line    
+    var attackLine = findString(data, searchString, true);
+    if (attackLine === false || attackLine === undefined) {
+        return 0
+    } else {
+    
+        attackLine = attackLine.replace(searchString,"");
+        attackLine = attackLine.trim();
+        //separate the attack line into two arrays, one with content from outside brackets, one inside.
+        var attackBrackets = getAllSubStr(attackLine,"(", ")");
+        var attackNoBrackets = stripStringRegEx(attackLine,"(", ")");
+        attackNoBrackets = stripString(attackNoBrackets," and ",",");
+        attackNoBrackets = stripString(attackNoBrackets," or ",",");
+        attackNoBrackets = attackNoBrackets.split(",");
+        //initialise the variables outside the loops
+        var attackName = "",
+            dmgDiceNum = "",
+            dmgDiceSides = "",
+            dmgDiceAdd = "",
+            threatenString = "",
+            critMultString = "",
+            attackString = ""
+            attackValues = [""]
+            attack = 0
+            damage = 0
+            enhance = [0]
+            mwk = [0]
+            abilityAttackString = ""
+            abiStrAttackHeader = ""
+            abiStrAttack = ""
+            abiStrAttackFooter = ""
+            extraDice = "";
+        // cycle through each element in the array of attacks
+        for ( i=0; i<attackNoBrackets.length; i++) {
+            attackNoBrackets[i] = attackNoBrackets[i].trim();
+            
+            //if there are any spaces inside brackets (indicating there is an extra effect)
+            // then set the extraDice = everything after the first space, else ""
+            if(attackBrackets[i].match(/\S+\s/) === null) {
+                extraDice = ""
+            } else {
+                extraDice = attackBrackets[i].replace(/\S+\s/, "");
+            }
+            
+            extraDice = extraDice.replace(")","");
+            //adds the hits and crits mod tag for use in the damage macro later, as well as surrounding
+            //anything in format  XdX with [[ ]] brackets for an inline roll.
+            extraDice = extraDice.replace(/(\d+d\d)/g,"[[(?{Hits-Landed|0}+?{Crits-Landed|0})*$1]]");
+            //search for anything followed by a + in the attack, store as name. ( ) save name separate to +
+            attackName = attackNoBrackets[i].match(/(.*) \+/);
+            //search for XdX(+/-)X and store as damage string.
+            dmgString = attackBrackets[i].match(/(\d+)d(\d+)\+*?(\-*?\d+)/);
+            
+            //This if handles the case where the damage is just XdX  (no addition or subtraction)
+            if (dmgString === null) {
+                dmgString = attackBrackets[i].match(/(\d+)d(\d+)/);
+                dmgDiceAdd = 0;
+            } else {
+                dmgDiceAdd = parseInt(dmgString[3],10);
+            }
+            
+            dmgDiceNum = parseInt(dmgString[1],10);
+            dmgDiceSides = parseInt(dmgString[2],10);
+            
+            
+            //search for X- as threaten (eg 19-20 = 19), "/x"X as crit multiplier
+            threatenString = attackBrackets[i].match(/\/(\d+)-/);
+            critMultString = attackBrackets[i].match(/\/(\d+)\)/);
+            //if the first character is a + (eg +4 longsword) then remove the +, store the enhancement
+            enhance[i] = 0
+            if (attackNoBrackets[i].charAt(0)=== "+") {
+                enhance[i] = parseInt(attackNoBrackets[i].charAt(1),10);
+                attackNoBrackets[i] = attackNoBrackets[i].slice(1);
+            }
+            
+            if (enhance[i] > 0) {
+                mwk[i] = 1
+            } else {
+                mwk[i] = 0
+            }
+            
+            attackString = attackNoBrackets[i].match(/\+(\d+)/g);
+            attackValues = [""]
+            
+            for (n=0; n<attackString.length; n++) {
+             attackValues[n] = parseInt(attackString[n].replace("+",""),10);
+            }
+            
+            if (threatenString === null) {
+                threatenString = [20,20]
+            }
+            
+            if (critMultString === null) {
+                critMultString = ["/x2",2]
+            }
+            
+            //define the parts of the attack formula (header, body, footer)
+            abiStrAttackHeader = "/e @{Selected|Token_Name} attacks with "+attackName[1]+"!!!";
+            abiStrAttack = "";
+            for (j = 0; j< attackString.length;j++) {
+                abiStrAttack = abiStrAttack + "\nAttack "+(j+1)+": [[1d20 "+attackString[j]+"]]"
+                }
+            abiStrAttackFooter = "\nCrit on "+threatenString[1]+critMultString[0]+", "+reach+"ft Range)";
+            
+            //add the ability with the concatenated formula string
+            abilityAttackString = abiStrAttackHeader + abiStrAttack + abiStrAttackFooter;
+            addAbility(attackName[1], abilityAttackString, charID)
+            
+            //define the parts of the damage formula (Header, Body, Footer)
+            abiStrDamageHeader = "/e @{Selected|Token_name}'s "+ attackName[1] + " damage";
+            abiStrDamage = "\nTotal: [[(?{Hits-Landed|0}*"+dmgDiceNum+")d"+dmgDiceSides+"+?{Hits-Landed|0}*"+dmgDiceAdd+"+(?{Crits-Landed|0}*"+dmgDiceNum*critMultString[1]+")d"+dmgDiceSides+"+?{Crits-Landed|0}*"+dmgDiceAdd*critMultString[1]+")]] in ?{Hits-Landed|0} Hits and ?{Crits-Landed|0} Criticals.";
+            abiStrDamageFooter = "\n"+extraDice
+           
+            abilityDamageString = abiStrDamageHeader + abiStrDamage + abiStrDamageFooter;
+            addAbility(attackName[1]+"-DMG", abilityDamageString, charID);
+            var attackType = 0
+            var damageAbility = 0
+            if (searchString === "Melee") {
+                attackType = "@{attk-melee}"
+                damageAbility = "@{STR-mod}"
+            } else if (searchString === "Ranged") {
+                attackType = "@{attk-ranged}"
+            }
+
+
+            attack = attackValues[0]-attackBonus - enhance[i]
+            //assumes all melee attacks use full str bonus...
+            damage = dmgDiceAdd -dmgBonus - enhance[i]
+
+
+            // add repeating weapon X attributes (enhance = 1 and masterwork by default at this point
+            var repeatNum = i+repeatStartNum;
+            AddAttribute("repeating_weapon_"+repeatNum+"_enhance",enhance[i],charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_masterwork",mwk[i],charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_name",attackName[1],charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_attack",attack,charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_attack-type",attackType,charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_damage-dice-num",dmgDiceNum,charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_damage-die",dmgDiceSides,charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_damage",damage,charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_damage-ability",damageAbility,charID);
+            
+            AddAttribute("repeating_weapon_"+repeatNum+"_crit-target",threatenString[1],charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_crit-multiplier",critMultString[1],charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_range",reach,charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_proficiency","Yes",charID);
+            AddAttribute("repeating_weapon_"+repeatNum+"_notes","TestNotes",charID);
+            
+        }  
+        
+        return attackNoBrackets.length
+    }
+}
+
 
 on('chat:message', function (msg) {
  
@@ -252,6 +448,7 @@ on('chat:message', function (msg) {
         }
     }
 
+
     var charName = data[0].trim();
     
     // check if the character entry already exists, if so error and exit.
@@ -288,9 +485,20 @@ on('chat:message', function (msg) {
     var XP = xpHeader[1];
     AddAttribute("npc-xp",XP,charID);
     
+    //race, class, level
+    var raceMatch = data[2].match(/(\w+)\s(\w+)\s(\d+)/)
+    if( raceMatch!= null) {
+        var race = raceMatch[1], 
+            className = raceMatch[2],
+            classLevel = raceMatch[3];
+    AddAttribute("race",race,charID)
+    AddAttribute("class-0-name",className +" "+ classLevel,charID)
+    }
+    
     // Alignment, Size, Type
     var sizesWithSpace = "Fine ,Diminutive ,Tiny ,Small ,Medium ,Large ,Huge ,Gargantuan ,Colossal ";
     var sizesArray = sizesWithSpace.split(",");
+
 
     for (var i = 0; i < 9; i++) 
     {
@@ -303,6 +511,7 @@ on('chat:message', function (msg) {
     }
     
     //get subtype before destroying string
+
 
     
     
@@ -401,7 +610,7 @@ on('chat:message', function (msg) {
     //NPC sheet and add the values used to acFromNamed in order to determine
     // the total miscellenous armour bonus
     var acFromNamed = 0
-    
+        
     if (armorIndex != -1) {
     AddAttribute("armor-acbonus",acNumOnly[armorIndex],charID);
     acFromNamed = acFromNamed + acNumOnly[armorIndex];
@@ -425,7 +634,8 @@ on('chat:message', function (msg) {
     }
     var natural = acNumOnly[naturalIndex];
 
-//puts any other AC bonuses than the named into MISC
+
+    //puts any other AC bonuses than the named into MISC
     var ac = 0;
     
     if (sizeNum >= 0) {
@@ -444,7 +654,7 @@ on('chat:message', function (msg) {
     AddAttribute("AC-misc",miscAC,charID);
     
     
-    //*****Health*****
+    //****************  Health  ************************
     var hpArray = findString(data, "hp ", true);
     hpArray = stripStringRegEx(hpArray, "(", ")");
     hpArray = hpArray.split(" ");
@@ -452,7 +662,7 @@ on('chat:message', function (msg) {
     AddAttribute("NPC-HP",HP,charID);
     AddAttribute("npc-hd-misc",HP,charID);
     
-    //*****Saves*****
+    //****************  Saves  ************************
     var savesLine = findString(data, "Fort ", true);
     var savesArray = savesLine.split(",");
     savesNum = removeNonNumericFromArray(savesArray);
@@ -481,7 +691,32 @@ on('chat:message', function (msg) {
         defenseLine = defenseLine.replace("Defensive Abilities ","");
         AddAttribute("npc-defensive-abilities",defenseLine,charID);
     }
-    
+    //**************** Weaknesses *******************
+    var weakLine = findString(data, "Weaknesses ", true);
+    if (weakLine != null) 
+    { 
+        var weaknesses = weakLine.replace("Weaknesses ","");
+        AddAttribute("weaknesses",weaknesses,charID);
+    }
+    //************ Damage Resistance  ****************
+    var drLine = findString(data, "DR ", true);
+    if (drLine != null) { 
+        var damageResist = drLine.match(/DR (\d+\/\w+)/);
+        AddAttribute("DR",damageResist[1],charID);   
+    }
+    //************ Immunities  **********************
+    var immuneLine = findString(data, "Immune ", true);
+    if (immuneLine != null) {
+        immuneLine = immuneLine.replace(/SR .*/,"");
+        var immune = immuneLine.match(/Immune (.*);*?/)
+        AddAttribute("immunities",immune[1],charID);   
+    }
+    //************ Spell resistance  ****************
+    var srLine = findString(data, "SR ", true);
+    if (srLine != null) {
+        var sr = srLine.match(/SR (\d+)/)
+        AddAttribute("SR",sr[1],charID);   
+    }
     //*************** Speed ***********************
     
         var speedStr = findString(data, "Speed ", true);
@@ -523,6 +758,9 @@ on('chat:message', function (msg) {
     
     //*********** Space, Reach & Reach Notes **********
     // find line containing "Space"
+    var space = "",
+        reach = "";
+        
     var reachLine = findString(data, "Space ", true);
     if (reachLine != null) 
     {
@@ -531,15 +769,39 @@ on('chat:message', function (msg) {
     var reachArray = stripStringRegEx(reachLine, "(", ")");
     var reachNums = reachArray.split(",");
     reachNums = removeNonNumericFromArray (reachNums);
-    AddAttribute("space",reachNums[0],charID);
-    AddAttribute("reach",reachNums[1],charID);
+    space = reachNums[0];
+    reach = reachNums[1];
+
+
     AddAttribute("reach-notes",reachNotes,charID);
     }
     else
     {
-        AddAttribute("space",5,charID);
-        AddAttribute("reach",5,charID);
+    space = 5
+    reach = 5
     }
+    AddAttribute("space",space,charID);
+    AddAttribute("reach",reach,charID);
+    
+    //*********** BASE ATTACK BONUS **************
+    
+    var babArray = findString(data, "Base Atk", true);
+    babArray = babArray.split(",");
+    
+    var babNum = removeNonNumericFromArray(babArray);
+    AddAttribute("class-0-bab",babNum[0],charID);       
+
+
+    //************ MELEE ATTACK *******************
+    //*********************************************
+    // ParseAttack syntax:
+    // ParseAttack(text to search, string to look for, attack bonus, damage bonus, reach, repeat number, charID)
+    var numMeleeAttacks = parseAttack(data,"Melee", (babNum[0] + strMod), strMod, reach, 0, charID);
+
+
+    //************ RANGED ATTACK *******************
+    //**********************************************
+    var numRangedAttacks = parseAttack(data,"Ranged",(babNum[0] + dexMod),0, reach,numMeleeAttacks,charID);
     
     //*********** Special Attacks ****************
     var specAtks = findString(data, "Special Attacks", true);
@@ -560,15 +822,17 @@ on('chat:message', function (msg) {
     duringCombat = duringCombat.replace("During Combat ","");
     AddAttribute("npc-during-combat",duringCombat,charID);
     }
-    //*********** BASE ATTACK BONUS **************
     
-    var babArray = findString(data, "Base Atk", true);
-    babArray = babArray.split(",");
-    
-    var babNum = removeNonNumericFromArray(babArray);
-    AddAttribute("class-0-bab",babNum[0],charID);
-    
-    
+    //**************** FEATS **********************
+    var feats = findString(data, "Feats ", true);
+    if (feats!= null){
+    feats = feats.replace("Feats ","");
+    feats = feats.trim();
+    feats = feats.split(",");
+    for (i=0; i<feats.length ; i++) {
+        AddAttribute("repeating_feat_"+i+"_name",feats[i],charID);
+    }
+    }
     //****************SKILLS************************
     
     var skillsLine = findString(data, "Skills", true);
@@ -648,10 +912,11 @@ on('chat:message', function (msg) {
     AddAttribute("SQ",sqStr,charID);
     }
 
+
     var gearStr = findString(data, "Combat Gear", true);
     if (gearStr != null) {
     gearStr = gearStr.replace("Combat Gear ","");
-    gearStr = gearStr.split("Other Gear ");
+    gearStr = gearStr.split("Other Gear");
     AddAttribute("npc-combat-gear",gearStr[0],charID);
     AddAttribute("npc-other-gear",gearStr[1],charID);
     }
@@ -665,6 +930,7 @@ on('chat:message', function (msg) {
     token.set("bar3_max", HP||0);
     token.set("bar2_value", ac||0);
     token.set("showplayers_bar3", true);
+    token.set("status_blue",true);
     
     }
 });
