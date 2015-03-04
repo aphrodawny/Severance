@@ -925,12 +925,15 @@ on('chat:message', function (msg) {
     //****************  sets Token Name, Health, linked AC ******************
     
     token.set("name", tokenName||'');
-    token.set("showname", true);
+    token.set("showname", false);
+    token.set("showplayers_name", true);
     token.set("bar3_value", HP||0);
     token.set("bar3_max", HP||0);
-    token.set("bar2_value", ac||0);
+    token.set("bar1_value", ac||0);
     token.set("showplayers_bar3", true);
-    token.set("status_blue",true);
+    token.set("light_hassight", true);
+    token.set("status_blue",false);
+    //token.set("bar2_value", @{cmd}||10);
     
     }
 });
