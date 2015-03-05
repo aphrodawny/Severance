@@ -449,7 +449,12 @@ on('chat:message', function (msg) {
     }
 
 
-    var charName = data[0].trim();
+    //Split header into name and CR
+    var Header = data[0].split("CR");
+    var tokenName = Header[0].trim();
+    var charName = tokenName
+    var CR = Header[1];
+    
     
     // check if the character entry already exists, if so error and exit.
     var CheckSheet = findObjs({
@@ -474,10 +479,7 @@ on('chat:message', function (msg) {
     var charID = character.get('_id');
     token.set("represents", charID);
     
-    //Determine and enter CR
-    var Header = data[0].split("CR");
-    var tokenName = Header[0].trim();
-    var CR = Header[1];
+    //Enter CR
     AddAttribute("npc-cr",CR,charID);
     
     //split and enter XP
