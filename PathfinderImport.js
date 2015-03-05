@@ -347,7 +347,7 @@ function parseAttack(data,searchString, attackBonus, dmgBonus, reach,repeatStart
             }
             
             //define the parts of the attack formula (header, body, footer)
-            abiStrAttackHeader = "/e @{Selected|Token_Name} attacks with "+attackName[1]+"!!!";
+            abiStrAttackHeader = "/emas @{Selected|Token_Name} attacks @{Target|Token_Name} with "+attackName[1]+"!!!";
             abiStrAttack = "";
             for (j = 0; j< attackString.length;j++) {
                 abiStrAttack = abiStrAttack + "\nAttack "+(j+1)+": [[1d20 "+attackString[j]+"]]"
@@ -359,7 +359,7 @@ function parseAttack(data,searchString, attackBonus, dmgBonus, reach,repeatStart
             addAbility(attackName[1], abilityAttackString, charID)
             
             //define the parts of the damage formula (Header, Body, Footer)
-            abiStrDamageHeader = "/e @{Selected|Token_name}'s "+ attackName[1] + " damage";
+            abiStrDamageHeader = "/emas @{Selected|Token_name} does "+ attackName[1] + " damage";
             abiStrDamage = "\nTotal: [[(?{Hits-Landed|0}*"+dmgDiceNum+")d"+dmgDiceSides+"+?{Hits-Landed|0}*"+dmgDiceAdd+"+(?{Crits-Landed|0}*"+dmgDiceNum*critMultString[1]+")d"+dmgDiceSides+"+?{Crits-Landed|0}*"+dmgDiceAdd*critMultString[1]+")]] in ?{Hits-Landed|0} Hits and ?{Crits-Landed|0} Criticals.";
             abiStrDamageFooter = "\n"+extraDice
            
