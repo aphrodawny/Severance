@@ -6,7 +6,7 @@
     
     This script was written to import as much detail as possible from Pathfinder Reference Document's
     Stat Blocks into the Pathfinder NPC sheets. (may work a HeroLab stat blocks too, need to test)
-	
+    
     ****** Huge shout out first of all to Aaron for all his help and feedback. Wouldn't be able to do this without the tips!
 	****** Also Peter W for his original layout and the initial parsing. Kevin and HoneyBadger too for their work of this kind.
 	
@@ -101,8 +101,6 @@ function stripString(str, removeStr, replaceWith) {
     var r= new RegExp(removeStr.replace(RegExpEscapeSpecial,"\\$1"),'g');
     return str.replace(r,replaceWith);
 }
-
-
 
 
 /*Cleans up the string leaving text and hyperlinks */
@@ -347,7 +345,7 @@ function parseAttack(data,searchString, attackBonus, dmgBonus, reach,repeatStart
             }
             
             //define the parts of the attack formula (header, body, footer)
-            abiStrAttackHeader = "/emas @{Selected|Token_Name} attacks @{Target|Token_Name} with "+attackName[1]+"!!!";
+            abiStrAttackHeader = "/emas @{Selected|Token_Name} attacks @{Target|Token_name} with "+attackName[1]+"!!!";
             abiStrAttack = "";
             for (j = 0; j< attackString.length;j++) {
                 abiStrAttack = abiStrAttack + "\nAttack "+(j+1)+": [[1d20 "+attackString[j]+"]]"
@@ -448,13 +446,11 @@ on('chat:message', function (msg) {
         }
     }
 
-
-    //Split header into name and CR
     var Header = data[0].split("CR");
     var tokenName = Header[0].trim();
     var charName = tokenName
+    //data[0].trim();
     var CR = Header[1];
-    
     
     // check if the character entry already exists, if so error and exit.
     var CheckSheet = findObjs({
@@ -466,20 +462,54 @@ on('chat:message', function (msg) {
         sendChat("ERROR", "This character already exists.");
         return;
     };
-    
+    var gmnTest = "Testing GM notes population";
     //Create character entry in journal, assign token
     var character = createObj("character", {
         avatar: token.get("imgsrc"),
         name: charName,
-        bio: token.get('gmnotes'),
-        gmnotes: token.get('gmnotes'),
+        bio: '',
+        gmnotes: '',        
         archived: false
     });
-    
+
+// Copied section from cgen.js 
+// Cycles through data from gm notes, parses out special character and
+// returns a formatted string
+        var data = null;
+        var rawData = null;
+        var dispData = "";
+        
+        rawData = token.get("gmnotes");
+ //       this.creLog('RAW: ' + rawData);
+        if (!rawData) {throw "no token notes";}
+        data = rawData.split(/%3Cbr|\n/);
+        
+        //clean out all other data except text
+        for (var i = data.length; i >= 0; i--) {
+            if (data[i]) {
+                data[i] = CreatureGenPF.cleanString(data[i]).trim();
+                if (data[i][0]=">") {
+                    data[i] = data[i].replace(">","");
+                }
+                if (null === data[i].match(/[^\s]/)) {
+                    data.splice(i,1)
+                }
+            }
+        }
+        
+        for (var i = 0; i < data.length; i++)   {
+//            this.creLog('('+i+') ' + data[i],1);
+            dispData += data[i]+'<br>';
+        }
+
+character.set('gmnotes',dispData);
     var charID = character.get('_id');
     token.set("represents", charID);
     
-    //Enter CR
+    //--Determine and-- enter CR
+    //var Header = data[0].split("CR");
+    //var tokenName = Header[0].trim();
+    var CR = Header[1];
     AddAttribute("npc-cr",CR,charID);
     
     //split and enter XP
